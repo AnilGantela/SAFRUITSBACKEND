@@ -38,9 +38,6 @@ app.use(apiLimiter);
 /* -------------------- Middleware -------------------- */
 app.use(express.json());
 
-/* -------------------- Admin Routes -------------------- */
-app.use("/admin", adminRouter);
-
 /* -------------------- MongoDB -------------------- */
 const connectDB = async () => {
   try {
@@ -58,6 +55,8 @@ connectDB();
 app.get("/", (req, res) => {
   res.send("Hello from the backend!");
 });
+/* -------------------- Admin Routes -------------------- */
+app.use("/admin", adminRouter);
 
 /* -------------------- Protected Routes -------------------- */
 app.use(adminAuth);
