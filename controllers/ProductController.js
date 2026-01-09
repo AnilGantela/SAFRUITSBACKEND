@@ -1,0 +1,82 @@
+const Product = require("../models/Product");
+
+const createProduct = async (req, res) => {
+  try {
+    const { productName } = req.body;
+
+    if (!productName || !productName.trim()) {
+      return res.status(400).json({ message: "Product name is required" });
+    }
+
+    // Check if product already exists
+    const existingProduct = await Product.findOne({
+      productName: productName.trim().toUpperCase(),
+    });
+    if (existingProduct) {
+      return res.status(409).json({ message: "Product already exists" });
+    }
+
+    const newProduct = new Product({
+      productName: productName.trim().toUpperCase(),
+      categories: [], // initially empty
+      inStock: false, // default false until shipments/categories added
+      shipments: [],
+      orders: [],
+    });
+
+    const savedProduct = await newProduct.save();
+    res.status(201).json(savedProduct);
+  } catch (error) {
+    res.status(500).json({ message: "Server Error", error: error.message });
+  }
+};
+
+const createCategory = async (req, res) => {
+  try {
+    const { productName, categoryName } = req.body;
+
+    if (!productName || !productName.trim()) {
+      return res.status(400).json({ message: "Product name is required" });
+    }
+
+    if (!categoryName || !categoryName.trim()) {
+      return res.status(400).json({ message: "Category name is required" });
+    }
+
+    // Find product
+    const product = await Product.findOne({
+      productName: productName.trim().toUpperCase(),
+    });
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    // Check if category with the same name already exists
+    const existingCategory = product.categories.find(
+      (cat) =>
+        cat.categoryName.toLowerCase() === categoryName.trim().toLowerCase()
+    );
+    if (existingCategory) {
+      return res
+        .status(409)
+        .json({ message: "Category already exists for this product" });
+    }
+
+    // Add category
+    product.categories.push({
+      categoryName: categoryName.trim(),
+      inStock: false,
+      shipments: [],
+      orders: [],
+    });
+
+    product.hasCategories = true;
+
+    await product.save();
+    res.status(201).json(product);
+  } catch (error) {
+    res.status(500).json({ message: "Server Error", error: error.message });
+  }
+};
+
+module.exports = { createProduct, createCategory };
