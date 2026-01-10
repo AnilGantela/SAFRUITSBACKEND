@@ -7,5 +7,6 @@ const {
 
 productRouter.post("/create", createProduct);
 productRouter.get("/", getAllProducts);
+productRouter.get("/:productName/categories", getAllCategoriesOfProduct);
 productRouter.post("/category/create", createCategory);
 module.exports = productRouter;
