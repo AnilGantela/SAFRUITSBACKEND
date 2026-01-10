@@ -48,6 +48,11 @@ const ShipmentSchema = new mongoose.Schema({
     trim: true,
     unique: false,
   },
+  city: {
+    type: String,
+    required: true,
+    trim: true,
+  },
   transportCompany: {
     type: String,
     trim: true,

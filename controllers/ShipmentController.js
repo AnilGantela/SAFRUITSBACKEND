@@ -3,12 +3,15 @@ const Product = require("../models/Product");
 
 const createShipment = async (req, res) => {
   try {
-    const { products, vehicleNumber, transportCompany, shipmentDate } =
+    const { products, vehicleNumber, transportCompany, shipmentDate, city } =
       req.body;
 
     // Validate main shipment data
     if (!vehicleNumber) {
       return res.status(400).json({ message: "Vehicle number is required" });
+    }
+    if (!city) {
+      return res.status(400).json({ message: "City is required" });
     }
     if (!products || !Array.isArray(products) || products.length === 0) {
       return res
@@ -79,6 +82,7 @@ const createShipment = async (req, res) => {
       vehicleNumber,
       transportCompany: transportCompany || null,
       products: shipmentProducts,
+      city,
     });
 
     const savedShipment = await newShipment.save();
