@@ -129,4 +129,14 @@ const createShipment = async (req, res) => {
   }
 };
 
-module.exports = { createShipment };
+const getAllShipments = async (req, res) => {
+  try {
+    const shipments = await Shipment.find(); // await the query
+    res.status(200).json(shipments); // send the shipments as JSON
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server Error", error: error.message });
+  }
+};
+
+module.exports = { createShipment, getAllShipments };

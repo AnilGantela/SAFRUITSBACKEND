@@ -3,6 +3,7 @@ const {
   createProduct,
   createCategory,
   getAllProducts,
+  getAllCategoriesOfProduct,
 } = require("../controllers/ProductController");
 
 productRouter.post("/create", createProduct);
