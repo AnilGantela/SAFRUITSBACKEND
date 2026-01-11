@@ -75,6 +75,10 @@ const createOrder = asyncHandler(async (req, res) => {
         );
       }
 
+      if (shipmentProduct.remainingQuantity < item.quantity) {
+        throw new Error(`Insufficient shipment stock for ${item.productName}`);
+      }
+
       if (shipmentProduct.categoryId) {
         const product = await Product.findById(
           shipmentProduct.productId,
@@ -144,6 +148,21 @@ const createOrder = asyncHandler(async (req, res) => {
 
     await Promise.all(
       orderProducts.map(async (item) => {
+        await Shipment.updateOne(
+          {
+            _id: item.shipmentId,
+            "products.productId": item.productId,
+            ...(item.categoryId && {
+              "products.categoryId": item.categoryId,
+            }),
+          },
+          {
+            $inc: {
+              "products.$.remainingQuantity": -item.quantity,
+            },
+          },
+          { session }
+        );
         if (item.categoryId) {
           // 🔹 Product WITH category
 

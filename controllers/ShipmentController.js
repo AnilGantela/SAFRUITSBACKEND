@@ -70,6 +70,7 @@ const createShipment = async (req, res) => {
         productName: product.productName.toUpperCase(),
         categoryName: categoryNameFinal,
         quantity,
+        remainingQuantity: quantity,
         priceAtShipment,
         productId: product._id,
         categoryId,
