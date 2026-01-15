@@ -62,9 +62,9 @@ app.use("/admin", adminRouter);
 app.use(adminAuth);
 app.use("/products", productRouter);
 app.use("/shipments", shipmentRouter);
+app.use("/orders", orderRouter);
 app.use("/customers", customerRouter);
 app.use("/payments", paymentRouter);
-app.use("/orders", orderRouter);
 
 /* -------------------- Server -------------------- */
 const PORT = process.env.PORT || 5000;

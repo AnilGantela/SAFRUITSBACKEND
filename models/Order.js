@@ -57,12 +57,6 @@ const orderSchema = new mongoose.Schema({
     required: true,
     trim: true,
   },
-  payments: [
-    {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Payment",
-    },
-  ],
   city: {
     type: String,
     trim: true,
@@ -73,11 +67,6 @@ const orderSchema = new mongoose.Schema({
     default: [],
   },
   totalAmount: {
-    type: Number,
-    required: true,
-    min: 0,
-  },
-  remainingAmount: {
     type: Number,
     required: true,
     min: 0,

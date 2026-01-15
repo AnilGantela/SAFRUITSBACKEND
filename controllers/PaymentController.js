@@ -1,70 +1,80 @@
 const mongoose = require("mongoose");
 const Payment = require("../models/Payment");
-const Order = require("../models/Order");
 const Customer = require("../models/Customer");
 
 const createPayment = async (req, res) => {
   const session = await mongoose.startSession();
 
   try {
-    const { amount, orderId } = req.body;
+    const { amount, customerId, paymentMode } = req.body;
 
+    // 1️⃣ Validate input
     if (!amount || amount <= 0) {
       return res.status(400).json({ message: "Invalid payment amount" });
     }
 
-    if (!orderId) {
-      return res.status(400).json({ message: "Order ID is required" });
+    if (!customerId) {
+      return res.status(400).json({ message: "Customer ID is required" });
+    }
+
+    if (!paymentMode || typeof paymentMode !== "string") {
+      return res.status(400).json({ message: "Payment mode is required" });
     }
 
     session.startTransaction();
 
-    const order = await Order.findById(orderId).session(session);
-    if (!order) {
+    // 2️⃣ Load customer
+    const customer = await Customer.findById(customerId).session(session);
+    if (!customer) {
       await session.abortTransaction();
-      return res.status(404).json({ message: "Order not found" });
+      return res.status(404).json({ message: "Customer not found" });
     }
 
-    if (amount > order.remainingAmount) {
+    // 3️⃣ Business rules
+    if (customer.pendingAmount === 0) {
       await session.abortTransaction();
-      return res
-        .status(400)
-        .json({ message: "Payment exceeds remaining amount" });
+      return res.status(400).json({
+        message: "Customer has no pending amount",
+      });
     }
 
-    // ✅ Destructuring here
+    if (amount > customer.pendingAmount) {
+      await session.abortTransaction();
+      return res.status(400).json({
+        message: "Payment exceeds customer's pending amount",
+      });
+    }
+
+    // 4️⃣ Create payment
     const [payment] = await Payment.create(
       [
         {
-          orderId,
           amount,
-          customerId: order.customerId,
+          paymentMode,
+          customerId,
         },
       ],
       { session }
     );
 
-    const updatedOrder = await Order.findByIdAndUpdate(
-      orderId,
+    const updatedCustomer = await Customer.findOneAndUpdate(
+      { _id: customerId, pendingAmount: { $gte: amount } },
       {
-        $inc: { remainingAmount: -amount },
+        $inc: { pendingAmount: -amount },
         $push: { payments: payment._id },
       },
       { new: true, session }
     );
 
-    await Customer.findByIdAndUpdate(
-      order.customerId,
-      {
-        $push: { payments: payment._id },
-      },
-      { session }
-    );
+    if (!updatedCustomer) {
+      throw new Error("Insufficient pending amount");
+    }
 
     await session.commitTransaction();
+
     res.status(201).json({
       payment,
-      remainingAmount: updatedOrder.remainingAmount,
+      pendingAmount: updatedCustomer.pendingAmount,
     });
   } catch (error) {
     await session.abortTransaction();

@@ -114,9 +114,31 @@ const getAllCategoriesOfProduct = async (req, res) => {
   }
 };
 
+const getAllNamesAndCategories = async (req, res) => {
+  try {
+    // Fetch all products
+    const products = await Product.find(
+      {},
+      "productName categories.categoryName"
+    );
+
+    // Format response as: [{ productName, categories: [categoryName1, categoryName2] }, ...]
+    const result = products.map((product) => ({
+      productName: product.productName,
+      categories: product.categories.map((cat) => cat.categoryName),
+    }));
+
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Error fetching products and categories:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 module.exports = {
   createProduct,
   createCategory,
   getAllProducts,
   getAllCategoriesOfProduct,
+  getAllNamesAndCategories,
 };

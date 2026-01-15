@@ -17,7 +17,7 @@ const shipmentProductSchema = new mongoose.Schema(
       required: true,
       min: 1,
     },
-    remainingQunatity: {
+    remainingQuantity: {
       type: Number,
       required: true,
       min: 0,

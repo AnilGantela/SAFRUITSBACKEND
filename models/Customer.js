@@ -9,7 +9,6 @@ const userSchema = new mongoose.Schema({
   email: {
     type: String,
     trim: true,
-    unique: true,
     lowercase: true,
     default: null,
   },
@@ -23,6 +22,11 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true,
     default: null,
+  },
+  pendingAmount: {
+    type: Number,
+    default: 0,
+    min: 0,
   },
   orders: [
     {
@@ -38,9 +42,13 @@ const userSchema = new mongoose.Schema({
   ],
   registeredAt: {
     type: Date,
-    required: true,
     default: Date.now,
   },
 });
+
+userSchema.index(
+  { email: 1 },
+  { unique: true, partialFilterExpression: { email: { $ne: null } } }
+);
 
 module.exports = mongoose.model("Customer", userSchema);

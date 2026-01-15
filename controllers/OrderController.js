@@ -127,7 +127,6 @@ const createOrder = asyncHandler(async (req, res) => {
       customerName: customer.customerName,
       orderProducts,
       totalAmount,
-      remainingAmount: totalAmount,
       city,
     });
     const createdOrder = await order.save({ session });
@@ -135,9 +134,10 @@ const createOrder = asyncHandler(async (req, res) => {
     await Customer.findByIdAndUpdate(
       customer._id,
       {
-        $push: { orders: createdOrder._id },
+        $addToSet: { orders: createdOrder._id },
+        $inc: { pendingAmount: createdOrder.totalAmount },
       },
-      { session }
+      { session, new: true }
     );
 
     await Shipment.updateMany(
@@ -149,20 +149,25 @@ const createOrder = asyncHandler(async (req, res) => {
     await Promise.all(
       orderProducts.map(async (item) => {
         await Shipment.updateOne(
-          {
-            _id: item.shipmentId,
-            "products.productId": item.productId,
-            ...(item.categoryId && {
-              "products.categoryId": item.categoryId,
-            }),
-          },
+          { _id: item.shipmentId },
           {
             $inc: {
-              "products.$.remainingQuantity": -item.quantity,
+              "products.$[prod].remainingQuantity": -item.quantity,
             },
           },
-          { session }
+          {
+            session,
+            arrayFilters: [
+              {
+                "prod.productId": item.productId,
+                ...(item.categoryId
+                  ? { "prod.categoryId": item.categoryId }
+                  : { "prod.categoryId": null }),
+              },
+            ],
+          }
         );
+
         if (item.categoryId) {
           // 🔹 Product WITH category
 
