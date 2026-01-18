@@ -27,7 +27,7 @@ const createOrder = asyncHandler(async (req, res) => {
         phoneNumber: customerNumber.trim(),
       },
       null,
-      { session }
+      { session },
     );
     if (!customer) {
       throw new Error("Customer not found");
@@ -42,7 +42,7 @@ const createOrder = asyncHandler(async (req, res) => {
       }
       if (item.quantity <= 0) {
         throw new Error(
-          `Product ${item.productName} quantity must be greater than zero`
+          `Product ${item.productName} quantity must be greater than zero`,
         );
       }
       if (!item.shipmentId) {
@@ -71,7 +71,7 @@ const createOrder = asyncHandler(async (req, res) => {
 
       if (!shipmentProduct) {
         throw new Error(
-          `Product '${item.productName}' with category '${item.categoryName}' not found in shipment ${item.shipmentId}`
+          `Product '${item.productName}' with category '${item.categoryName}' not found in shipment ${item.shipmentId}`,
         );
       }
 
@@ -85,16 +85,16 @@ const createOrder = asyncHandler(async (req, res) => {
           null,
           {
             session,
-          }
+          },
         );
 
         const category = product.categories.find(
-          (c) => c._id.toString() === shipmentProduct.categoryId.toString()
+          (c) => c._id.toString() === shipmentProduct.categoryId.toString(),
         );
 
         if (!category || category.categoryQuantity < item.quantity) {
           throw new Error(
-            `Insufficient stock for ${item.productName} in category ${shipmentProduct.categoryName}`
+            `Insufficient stock for ${item.productName} in category ${shipmentProduct.categoryName}`,
           );
         }
       }
@@ -102,7 +102,7 @@ const createOrder = asyncHandler(async (req, res) => {
         const product = await Product.findById(
           shipmentProduct.productId,
           null,
-          { session }
+          { session },
         );
 
         if (product.quantity < item.quantity) {
@@ -137,13 +137,13 @@ const createOrder = asyncHandler(async (req, res) => {
         $addToSet: { orders: createdOrder._id },
         $inc: { pendingAmount: createdOrder.totalAmount },
       },
-      { session, new: true }
+      { session, new: true },
     );
 
     await Shipment.updateMany(
       { _id: { $in: orderProducts.map((p) => p.shipmentId) } },
       { $push: { orders: createdOrder._id } },
-      { session }
+      { session },
     );
 
     await Promise.all(
@@ -165,7 +165,7 @@ const createOrder = asyncHandler(async (req, res) => {
                   : { "prod.categoryId": null }),
               },
             ],
-          }
+          },
         );
 
         if (item.categoryId) {
@@ -178,7 +178,7 @@ const createOrder = asyncHandler(async (req, res) => {
               $inc: { "categories.$.categoryQuantity": -item.quantity },
               $push: { "categories.$.orders": createdOrder._id },
             },
-            { session }
+            { session },
           );
 
           // 2. Recalculate category & product inStock
@@ -217,7 +217,7 @@ const createOrder = asyncHandler(async (req, res) => {
                 },
               },
             ],
-            { session, updatePipeline: true }
+            { session, updatePipeline: true },
           );
 
           const product = await Product.findById(item.productId, null, {
@@ -226,7 +226,7 @@ const createOrder = asyncHandler(async (req, res) => {
           product.inStock = product.productQuantity > 0;
           await product.save({ session });
         }
-      })
+      }),
     );
 
     await session.commitTransaction();
@@ -239,6 +239,26 @@ const createOrder = asyncHandler(async (req, res) => {
   }
 });
 
+const Order = require("../models/Order");
+
+const getAllOrders = async (req, res) => {
+  try {
+    const orders = await Order.find().sort({ orderDate: -1 });
+
+    res.status(200).json({
+      success: true,
+      count: orders.length,
+      orders,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 module.exports = {
+  getAllOrders,
   createOrder,
 };
