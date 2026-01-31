@@ -239,8 +239,6 @@ const createOrder = asyncHandler(async (req, res) => {
   }
 });
 
-const Order = require("../models/Order");
-
 const getAllOrders = async (req, res) => {
   try {
     const orders = await Order.find().sort({ orderDate: -1 });

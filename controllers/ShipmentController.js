@@ -54,7 +54,8 @@ const createShipment = async (req, res) => {
 
       if (categoryName) {
         const category = product.categories.find(
-          (cat) => cat.categoryName.toLowerCase() === categoryName.toLowerCase()
+          (cat) =>
+            cat.categoryName.toLowerCase() === categoryName.toLowerCase(),
         );
         if (!category) {
           return res.status(404).json({
@@ -98,13 +99,13 @@ const createShipment = async (req, res) => {
             $push: { "categories.$.shipments": savedShipment._id },
             $set: { "categories.$.inStock": true }, // mark category inStock
             $inc: { "categories.$.categoryQuantity": item.quantity },
-          }
+          },
         );
 
         // After updating the category, make sure product inStock reflects categories
         const product = await Product.findById(item.productId);
         const anyCategoryInStock = product.categories.some(
-          (cat) => cat.inStock
+          (cat) => cat.inStock,
         );
         if (anyCategoryInStock) {
           product.inStock = true;
@@ -118,7 +119,7 @@ const createShipment = async (req, res) => {
             $push: { shipments: savedShipment._id },
             $set: { inStock: true }, // mark product inStock
             $inc: { productQuantity: item.quantity },
-          }
+          },
         );
       }
     }
@@ -140,4 +141,30 @@ const getAllShipments = async (req, res) => {
   }
 };
 
-module.exports = { createShipment, getAllShipments };
+const getShipmentById = async (req, res) => {
+  try {
+    const { shipmentId } = req.params;
+
+    const shipment = await Shipment.findById(shipmentId);
+
+    if (!shipment) {
+      return res.status(404).json({ message: "Shipment not found" });
+    }
+
+    res.status(200).json(shipment);
+  } catch (error) {
+    console.error(error);
+
+    // Handle invalid ObjectId
+    if (error.name === "CastError") {
+      return res.status(400).json({ message: "Invalid shipment ID" });
+    }
+
+    res.status(500).json({
+      message: "Server Error",
+      error: error.message,
+    });
+  }
+};
+
+module.exports = { createShipment, getAllShipments, getShipmentById };

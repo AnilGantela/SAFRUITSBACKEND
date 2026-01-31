@@ -1,4 +1,6 @@
 const Customer = require("../models/Customer");
+const Order = require("../models/Order.js"); // Adjust path
+const Payment = require("../models/Payment.js"); // Adjust path
 
 const createCustomer = async (req, res) => {
   try {
@@ -53,6 +55,53 @@ const createCustomer = async (req, res) => {
   }
 };
 
+const getAllCustomers = async (req, res) => {
+  try {
+    // Fetch all customers from database
+    const customers = await Customer.find({});
+
+    // Send response
+    res.status(200).json(customers);
+  } catch (error) {
+    console.error("Error fetching customers:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to fetch customers", error: error.message });
+  }
+};
+
+const getCustomerById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Find customer by ID and populate orders and payments
+    const customer = await Customer.findById(id)
+      .populate({
+        path: "orders",
+        model: Order,
+        select: "-__v", // Exclude __v if desired
+      })
+      .populate({
+        path: "payments",
+        model: Payment,
+        select: "-__v",
+      });
+
+    if (!customer) {
+      return res.status(404).json({ message: "Customer not found" });
+    }
+
+    res.status(200).json(customer);
+  } catch (error) {
+    console.error("Error fetching customer:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to fetch customer", error: error.message });
+  }
+};
+
 module.exports = {
   createCustomer,
+  getAllCustomers,
+  getCustomerById,
 };
