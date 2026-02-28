@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const Counter = require("./Counter");
 
 const orderProductSchema = new mongoose.Schema(
   {
