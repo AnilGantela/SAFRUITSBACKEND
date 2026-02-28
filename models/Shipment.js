@@ -27,6 +27,12 @@ const shipmentProductSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
+    totalSoldValue: {
+      type: Number,
+      required: true,
+      default: 0, // 🔹 new field to track money received from this product
+      min: 0,
+    },
     productId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Product",
@@ -38,7 +44,7 @@ const shipmentProductSchema = new mongoose.Schema(
       default: null, // null if product has no categories
     },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const ShipmentSchema = new mongoose.Schema({
@@ -52,6 +58,17 @@ const ShipmentSchema = new mongoose.Schema({
     required: true,
     trim: true,
     unique: false,
+  },
+  shipmentValue: {
+    type: Number,
+    required: true,
+    min: 0,
+  },
+  totalReceivedValue: {
+    type: Number,
+    required: true,
+    default: 0, // total money received from linked orders
+    min: 0,
   },
   city: {
     type: String,

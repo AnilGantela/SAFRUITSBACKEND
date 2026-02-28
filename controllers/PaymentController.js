@@ -54,7 +54,7 @@ const createPayment = async (req, res) => {
           customerId,
         },
       ],
-      { session }
+      { session },
     );
 
     const updatedCustomer = await Customer.findOneAndUpdate(
@@ -63,7 +63,7 @@ const createPayment = async (req, res) => {
         $inc: { pendingAmount: -amount },
         $push: { payments: payment._id },
       },
-      { new: true, session }
+      { new: true, session },
     );
 
     if (!updatedCustomer) {
@@ -87,6 +87,33 @@ const createPayment = async (req, res) => {
   }
 };
 
+const getAllPaymentsInfo = async (req, res) => {
+  try {
+    // Fetch all payments with customer details
+    const payments = await Payment.find()
+      .populate("customerId", " customerName phoneNumber pendingAmount")
+      .sort({ paymentDate: -1 });
+
+    // Calculate total collected amount
+    const totalCollection = payments.reduce(
+      (sum, payment) => sum + payment.amount,
+      0,
+    );
+
+    res.status(200).json({
+      totalPayments: payments.length,
+      totalCollection,
+      payments,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to fetch payments",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   createPayment,
+  getAllPaymentsInfo,
 };

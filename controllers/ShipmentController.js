@@ -1,53 +1,50 @@
 const Shipment = require("../models/Shipment");
 const Product = require("../models/Product");
 
+const mongoose = require("mongoose");
+
 const createShipment = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const { products, vehicleNumber, transportCompany, shipmentDate, city } =
       req.body;
 
     // Validate main shipment data
-    if (!vehicleNumber) {
+    if (!vehicleNumber)
       return res.status(400).json({ message: "Vehicle number is required" });
-    }
-    if (!city) {
-      return res.status(400).json({ message: "City is required" });
-    }
+    if (!city) return res.status(400).json({ message: "City is required" });
     if (!products || !Array.isArray(products) || products.length === 0) {
       return res
         .status(400)
         .json({ message: "At least one product is required" });
     }
 
+    // Get unique product names
+    const productNames = products.map((p) => p.productName.toUpperCase());
+    const dbProducts = await Product.find({
+      productName: { $in: productNames },
+    }).session(session);
+
     const shipmentProducts = [];
 
-    // Process each product in the request
     for (let item of products) {
       const { productName, quantity, priceAtShipment, categoryName } = item;
 
-      if (!productName) {
-        return res.status(400).json({ message: "Product name is required" });
-      }
-      if (!priceAtShipment || priceAtShipment <= 0) {
-        return res.status(400).json({
-          message: "Price at shipment is required for " + productName,
-        });
-      }
-      if (!quantity || quantity < 1) {
-        return res
-          .status(400)
-          .json({ message: "Quantity must be at least 1 for " + productName });
-      }
+      if (!productName) throw new Error("Product name is required");
+      if (!priceAtShipment || priceAtShipment <= 0)
+        throw new Error(`Price at shipment is required for ${productName}`);
+      if (!quantity || quantity < 1)
+        throw new Error(`Quantity must be at least 1 for ${productName}`);
 
-      // Find the product
-      const product = await Product.findOne({
-        productName: productName.toUpperCase(),
-      });
-      if (!product) {
+      const product = dbProducts.find(
+        (p) => p.productName === productName.toUpperCase(),
+      );
+      if (!product)
         return res
           .status(404)
-          .json({ message: "Product not found: " + productName });
-      }
+          .json({ message: `Product not found: ${productName}` });
 
       let categoryId = null;
       let categoryNameFinal = null;
@@ -57,16 +54,14 @@ const createShipment = async (req, res) => {
           (cat) =>
             cat.categoryName.toLowerCase() === categoryName.toLowerCase(),
         );
-        if (!category) {
+        if (!category)
           return res.status(404).json({
             message: `Category '${categoryName}' not found for product '${productName}'`,
           });
-        }
         categoryId = category._id;
         categoryNameFinal = category.categoryName.toLowerCase();
       }
 
-      // Add product to shipment array
       shipmentProducts.push({
         productName: product.productName.toUpperCase(),
         categoryName: categoryNameFinal,
@@ -78,54 +73,80 @@ const createShipment = async (req, res) => {
       });
     }
 
-    // Create the shipment with all products
+    const shipmentValue = shipmentProducts.reduce(
+      (total, item) => total + item.quantity * item.priceAtShipment,
+      0,
+    );
+
+    // Create the shipment
     const newShipment = new Shipment({
       shipmentDate: shipmentDate ? new Date(shipmentDate) : Date.now(),
       vehicleNumber,
       transportCompany: transportCompany || null,
       products: shipmentProducts,
       city,
+      shipmentValue,
     });
 
-    const savedShipment = await newShipment.save();
+    const savedShipment = await newShipment.save({ session });
 
-    // Update product/category shipments
+    // Prepare bulk operations for product updates
+    const bulkOps = [];
+
     for (let item of shipmentProducts) {
       if (item.categoryId) {
-        // Product has a category
-        await Product.updateOne(
-          { _id: item.productId, "categories._id": item.categoryId },
-          {
-            $push: { "categories.$.shipments": savedShipment._id },
-            $set: { "categories.$.inStock": true }, // mark category inStock
-            $inc: { "categories.$.categoryQuantity": item.quantity },
+        // Update category-level shipments and quantities
+        bulkOps.push({
+          updateOne: {
+            filter: { _id: item.productId, "categories._id": item.categoryId },
+            update: {
+              $push: { "categories.$.shipments": savedShipment._id },
+              $set: { "categories.$.inStock": true },
+              $inc: { "categories.$.categoryQuantity": item.quantity },
+            },
           },
-        );
-
-        // After updating the category, make sure product inStock reflects categories
-        const product = await Product.findById(item.productId);
-        const anyCategoryInStock = product.categories.some(
-          (cat) => cat.inStock,
-        );
-        if (anyCategoryInStock) {
-          product.inStock = true;
-          await product.save();
-        }
+        });
       } else {
-        // No category, update product
-        await Product.updateOne(
-          { _id: item.productId },
-          {
-            $push: { shipments: savedShipment._id },
-            $set: { inStock: true }, // mark product inStock
-            $inc: { productQuantity: item.quantity },
+        // Update product-level shipments and quantities
+        bulkOps.push({
+          updateOne: {
+            filter: { _id: item.productId },
+            update: {
+              $push: { shipments: savedShipment._id },
+              $set: { inStock: true },
+              $inc: { productQuantity: item.quantity },
+            },
           },
-        );
+        });
       }
     }
 
+    if (bulkOps.length > 0) {
+      await Product.bulkWrite(bulkOps, { session });
+    }
+
+    // After bulk update, ensure product inStock reflects categories
+    const productIds = [
+      ...new Set(shipmentProducts.map((p) => p.productId.toString())),
+    ];
+    const updatedProducts = await Product.find({
+      _id: { $in: productIds },
+    }).session(session);
+
+    for (let product of updatedProducts) {
+      if (product.categories.length > 0) {
+        product.inStock = product.categories.some((cat) => cat.inStock);
+        await product.save({ session });
+      }
+    }
+
+    await session.commitTransaction();
+    session.endSession();
+
     return res.status(201).json({ shipment: savedShipment });
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
     console.error(error);
     res.status(500).json({ message: "Server Error", error: error.message });
   }
@@ -167,4 +188,40 @@ const getShipmentById = async (req, res) => {
   }
 };
 
-module.exports = { createShipment, getAllShipments, getShipmentById };
+const getShipmentsByProductName = async (req, res) => {
+  try {
+    const { productName } = req.params; // or req.query.productName
+
+    if (!productName || !productName.trim()) {
+      return res.status(400).json({ message: "Product name is required" });
+    }
+
+    // Find shipments where products array has the product with remainingQuantity > 0
+    const shipments = await Shipment.find({
+      products: {
+        $elemMatch: {
+          productName: { $regex: `^${productName}$`, $options: "i" }, // case-insensitive exact match
+          remainingQuantity: { $gt: 0 }, // greater than zero
+        },
+      },
+    });
+
+    if (!shipments.length) {
+      return res
+        .status(404)
+        .json({ message: "No shipments found for this product" });
+    }
+
+    res.status(200).json(shipments);
+  } catch (error) {
+    console.error("Error fetching shipments by product:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+module.exports = {
+  createShipment,
+  getAllShipments,
+  getShipmentById,
+  getShipmentsByProductName,
+};

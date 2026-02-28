@@ -100,8 +100,33 @@ const getCustomerById = async (req, res) => {
   }
 };
 
+const getCustomerByPhoneNumber = async (req, res) => {
+  try {
+    const { phoneNumber } = req.params; // e.g., /customers/phone/9110769027
+
+    if (!phoneNumber || !phoneNumber.trim()) {
+      return res.status(400).json({ message: "Phone number is required" });
+    }
+
+    const normalizedPhone = phoneNumber.trim();
+    const customer = await Customer.findOne({
+      phoneNumber: normalizedPhone,
+    }).select("-__v -orders -payments");
+
+    if (!customer) {
+      return res.status(404).json({ message: "Customer not found" });
+    }
+
+    res.status(200).json(customer);
+  } catch (error) {
+    console.error("Error fetching customer:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
 module.exports = {
   createCustomer,
   getAllCustomers,
   getCustomerById,
+  getCustomerByPhoneNumber,
 };
